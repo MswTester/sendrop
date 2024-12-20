@@ -4,8 +4,6 @@ function socketLog(...args){
   socket.emit("log", ...args);
 };
 
-const timeoutMs = 3000;
-
 const deviceList = document.getElementById('deviceList');
 const overlay = document.getElementById('overlay');
 const alerts = document.getElementById('alerts');
@@ -67,10 +65,7 @@ socket.on('receiveTextRequest', ({ sender, senderId }) => {
     requestFrom = senderId;
 });
 
-function addAlert(message, type, timeout = timeoutMs, del = false, progress = 0) {
-    if(del) Array.from(alerts.children).forEach((child, i) => {
-        if(i === alerts.children.length - 1) child.remove();
-    })
+function addAlert(message, type) {
     const alert = document.createElement('div')
     alert.classList.add('alert');
     const col = document.createElement('div');
@@ -103,7 +98,6 @@ function addAlert(message, type, timeout = timeoutMs, del = false, progress = 0)
             progressBar.classList.add('progress-bar');
             const progressFill = document.createElement('div');
             progressBar.appendChild(progressFill);
-            progressFill.style.width = `${progress * 100}%`
             col.appendChild(progressBar);
             break;
         default:
@@ -112,14 +106,10 @@ function addAlert(message, type, timeout = timeoutMs, del = false, progress = 0)
             closeButton.addEventListener('click', (event) => {
                 alert.remove();
             }, {once: true});
-            col.append(closeButton);
             break;
     }
     alert.append(col);
     alerts.append(alert);
-    setTimeout(() => {
-        if(alert) alert.remove()
-    }, timeout);
 }
 
 socket.on('receiveText', ({ text }) => {
@@ -135,7 +125,7 @@ copyButton.addEventListener('click', e => {
 
 let fileChunks = [];
 socket.on('receiveFile', ({ fileName, fileContent, chunkIndex, totalChunks }) => {
-    addAlert(`Receiving ${fileName} (${chunkIndex + 1}/${totalChunks})`, 'progress', true, (chunkIndex + 1) / totalChunks);
+    addAlert(`Receiving ${fileName} (${chunkIndex + 1}/${totalChunks})`, 'progress');
     fileChunks[chunkIndex] = fileContent;
     if (fileChunks.length === totalChunks) {
         const blob = new Blob(fileChunks);
@@ -217,6 +207,7 @@ sendButton.addEventListener('click', (event) => {
             const totalChunks = Math.ceil(file.size / chunkSize);
             const reader = new FileReader();
             let chunkIndex = 0;
+            addAlert(`Sending file (${chunkIndex}/${totalChunks})`, 'progress')
             reader.onload = () => {
                 socket.emit('sendFile', {
                     targetId,
@@ -232,7 +223,6 @@ sendButton.addEventListener('click', (event) => {
             };
     
             const loadNextChunk = () => {
-                addAlert(`Sending file (${chunkIndex}/${totalChunks})`, 'progress', true, chunkIndex / totalChunks)
                 const start = chunkIndex * chunkSize;
                 const end = Math.min(start + chunkSize, file.size);
                 const blob = file.slice(start, end);
